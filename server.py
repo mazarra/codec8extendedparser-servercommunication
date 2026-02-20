@@ -6,7 +6,7 @@ import struct
 import decimal
 import subprocess
 
-HOST = "192.168.50.34"  #function may not work in Linux systems, change to string with IP adress example: "192.168.0.1"
+HOST = "172.16.107.27"  #function may not work in Linux systems, change to string with IP adress example: "192.168.0.1"
 PORT = 665  #change this to your port
 
 def input_trigger(): #triggers user input
@@ -29,7 +29,13 @@ def input_trigger(): #triggers user input
                                 print()
                                 input_trigger()
                         else:
-                                pass
+                                codec_8E_packet = user_input.replace(" ", "")
+                                io_dict_raw = {}
+                                io_dict_raw["device_IMEI"] = device_imei
+                                io_dict_raw["server_time"] = time_stamper_for_json()
+                                io_dict_raw["data_length"] = "Record length: " + str(int(len(codec_8E_packet))) + " characters" + " // " + str(int(len(codec_8E_packet) // 2)) + " bytes"
+                                io_dict_raw["_raw_data__"] = codec_8E_packet
+                                json_printer_rawDATA(io_dict_raw, device_imei)
                 except Exception as e:
                         print(f"error occured: {e} enter proper Codec8 packet or EXIT!!!")
                         input_trigger()
