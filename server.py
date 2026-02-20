@@ -29,7 +29,7 @@ def input_trigger(): #triggers user input
                                 print()
                                 input_trigger()
                         else:
-                                codec_parser_trigger(user_input, device_imei, "USER")
+                                pass
                 except Exception as e:
                         print(f"error occured: {e} enter proper Codec8 packet or EXIT!!!")
                         input_trigger()
@@ -70,14 +70,6 @@ def codec_8e_checker(codec8_packet):
                 return False
         else:
                 return crc16_arc(codec8_packet)
-
-def codec_parser_trigger(codec8_packet, device_imei, props):
-                try:
-                        return codec_8e_parser(codec8_packet.replace(" ",""), device_imei, props)
-
-                except Exception as e:
-                        print(f"Error occured: {e} enter proper Codec8 packet or EXIT!!!")
-                        input_trigger()
 
 def imei_checker(hex_imei): #IMEI checker function
         imei_length = int(hex_imei[:4], 16)
@@ -123,7 +115,7 @@ def start_server_trigger():
                                                         conn.sendall(imei_reply)
                                                         print(f"-- {time_stamper()} sending reply = {imei_reply}")
                                                 elif codec_8e_checker(data.hex().replace(" ","")) != False:
-                                                        record_number = codec_parser_trigger(data.hex(), device_imei, "SERVER")
+                                                        record_number = int((data.hex().replace(" ", ""))[18:18+2], 16)
                                                         print(f"received records {record_number}")
                                                         print(f"from device IMEI = {device_imei}")
                                                         print()
@@ -137,236 +129,6 @@ def start_server_trigger():
                                                 print(f"// {time_stamper()} // Socket timed out. Closing connection with {addr}")
                                                 break
 
-####################################################
-###############_Codec8E_parser_code_################
-####################################################
-
-def codec_8e_parser(codec_8E_packet, device_imei, props): #think a lot before modifying  this function
-        print()
-#       print (str("codec 8 string entered - " + codec_8E_packet))
-
-        io_dict_raw = {}
-#       timestamp = codec_8E_packet[20:36]
-        io_dict_raw["device_IMEI"] = device_imei
-        io_dict_raw["server_time"] = time_stamper_for_json()
-#       io_dict_raw["_timestamp_"] = device_time_stamper(timestamp)
-#       io_dict_raw["_rec_delay_"] = record_delay_counter(timestamp)
-        io_dict_raw["data_length"] = "Record length: " + str(int(len(codec_8E_packet))) + " characters" + " // " + str(int(len(codec_8E_packet) // 2)) + " bytes"
-        io_dict_raw["_raw_data__"] = codec_8E_packet
-
-        try: #writing raw DATA dictionary to ./data/data.json
-                json_printer_rawDATA(io_dict_raw, device_imei)
-        except Exception as e:
-                print(f"JSON raw data writing error occured = {e}")
-
-        zero_bytes = codec_8E_packet[:8]
-        print()
-        print (str("zero bytes = " + zero_bytes))
-
-        data_field_length = int(codec_8E_packet[8:8+8], 16)
-        print (f"data field lenght = {data_field_length} bytes")
-        codec_type = str(codec_8E_packet[16:16+2])
-        print (f"codec type = {codec_type}")
-
-        data_step = 4
-        if codec_type == "08":
-                data_step = 2
-        else:
-                pass
-
-        number_of_records = int(codec_8E_packet[18:18+2], 16)
-        print (f"number of records = {number_of_records}")
-
-        record_number = 1
-        avl_data_start = codec_8E_packet[20:]
-        data_field_position = 0
-        while data_field_position < (2*data_field_length-6):
-                io_dict = {}
-                io_dict["device_IMEI"] = device_imei
-                io_dict["server_time"] = time_stamper_for_json()
-                print()
-                print (f"data from record {record_number}")
-                print (f"########################################")
-
-                timestamp = avl_data_start[data_field_position:data_field_position+16]
-                io_dict["_timestamp_"] = device_time_stamper(timestamp)
-                print (f"timestamp = {device_time_stamper(timestamp)}")
-                io_dict["_rec_delay_"] = record_delay_counter(timestamp)
-                data_field_position += len(timestamp)
-
-                priority = avl_data_start[data_field_position:data_field_position+2]
-                io_dict["priority"] = int(priority, 16)
-                print (f"record priority = {int(priority, 16)}")
-                data_field_position += len(priority)
-
-                longitude = avl_data_start[data_field_position:data_field_position+8]
-        #       io_dict["longitude"] = struct.unpack('>i', bytes.fromhex(longitude))[0]
-        #       print (f"longitude = {struct.unpack('>i', bytes.fromhex(longitude))[0]}")
-                io_dict["longitude"] = coordinate_formater(longitude)
-                print (f"longitude = {coordinate_formater(longitude)}")
-                data_field_position += len(longitude)
-
-                latitude = avl_data_start[data_field_position:data_field_position+8]
-        #       print (f"latitude = {struct.unpack('>i', bytes.fromhex(latitude))[0]}")
-        #       io_dict["latitude"] = struct.unpack('>i', bytes.fromhex(latitude))[0]
-                io_dict["latitude"] = coordinate_formater(latitude)
-                print (f"latitude = {coordinate_formater(latitude)}")
-                data_field_position += len(latitude)
-
-                altitude = avl_data_start[data_field_position:data_field_position+4]
-                print(f"altitude = {int(altitude, 16)}")
-                io_dict["altitude"] = int(altitude, 16)
-                data_field_position += len(altitude)
-
-                angle = avl_data_start[data_field_position:data_field_position+4]
-                print(f"angle = {int(angle, 16)}")
-                io_dict["angle"] = int(angle, 16)
-                data_field_position += len(angle)
-
-                satelites = avl_data_start[data_field_position:data_field_position+2]
-                print(f"satelites = {int(satelites, 16)}")
-                io_dict["satelites"] = int(satelites, 16)
-                data_field_position += len(satelites)
-
-                speed = avl_data_start[data_field_position:data_field_position+4]
-                io_dict["speed"] = int(speed, 16)
-                print(f"speed = {int(speed, 16)}")
-                data_field_position += len(speed)
-
-                event_io_id = avl_data_start[data_field_position:data_field_position+data_step]
-                io_dict["eventID"] = int(event_io_id, 16)
-                print(f"event ID = {int(event_io_id, 16)}")
-                data_field_position += len(event_io_id)
-
-                total_io_elements = avl_data_start[data_field_position:data_field_position+data_step]
-                total_io_elements_parsed = int(total_io_elements, 16)
-                print(f"total I/O elements in record {record_number} = {total_io_elements_parsed}")
-                data_field_position += len(total_io_elements)
-
-                byte1_io_number = avl_data_start[data_field_position:data_field_position+data_step]
-                byte1_io_number_parsed = int(byte1_io_number, 16)
-                print(f"1 byte io count = {byte1_io_number_parsed}")
-                data_field_position += len(byte1_io_number)
-
-                if byte1_io_number_parsed > 0:
-                        i = 1
-                        while i <= byte1_io_number_parsed:
-                                key = avl_data_start[data_field_position:data_field_position+data_step]
-                                data_field_position += len(key)
-                                value = avl_data_start[data_field_position:data_field_position+2]
-
-                                io_dict[int(key, 16)] = sorting_hat(int(key, 16), value)
-                                data_field_position += len(value)
-                                print (f"avl_ID: {int(key, 16)} : {io_dict[int(key, 16)]}")
-                                i += 1
-                else:
-                        pass
-
-                byte2_io_number = avl_data_start[data_field_position:data_field_position+data_step]
-                byte2_io_number_parsed = int(byte2_io_number, 16)
-                print(f"2 byte io count = {byte2_io_number_parsed}")
-                data_field_position += len(byte2_io_number)
-
-                if byte2_io_number_parsed > 0:
-                        i = 1
-                        while i <= byte2_io_number_parsed:
-                                key = avl_data_start[data_field_position:data_field_position+data_step]
-                                data_field_position += len(key)
-
-                                value = avl_data_start[data_field_position:data_field_position+4]
-                                io_dict[int(key, 16)] = sorting_hat(int(key, 16), value)
-                                data_field_position += len(value)
-                                print (f"avl_ID: {int(key, 16)} : {io_dict[int(key, 16)]}")
-                                i += 1
-                else:
-                        pass
-
-                byte4_io_number = avl_data_start[data_field_position:data_field_position+data_step]
-                byte4_io_number_parsed = int(byte4_io_number, 16)
-                print(f"4 byte io count = {byte4_io_number_parsed}")
-                data_field_position += len(byte4_io_number)
-
-                if byte4_io_number_parsed > 0:
-                        i = 1
-                        while i <= byte4_io_number_parsed:
-                                key = avl_data_start[data_field_position:data_field_position+data_step]
-                                data_field_position += len(key)
-
-                                value = avl_data_start[data_field_position:data_field_position+8]
-                                io_dict[int(key, 16)] = sorting_hat(int(key, 16), value)
-                                data_field_position += len(value)
-                                print(f"avl_ID: {int(key, 16)} : {io_dict[int(key, 16)]}")
-                                i += 1
-                else:
-                        pass
-
-                byte8_io_number = avl_data_start[data_field_position:data_field_position+data_step]
-                byte8_io_number_parsed = int(byte8_io_number, 16)
-                print(f"8 byte io count = {byte8_io_number_parsed}")
-                data_field_position += len(byte8_io_number)
-
-                if byte8_io_number_parsed > 0:
-                        i = 1
-                        while i <= byte8_io_number_parsed:
-                                key = avl_data_start[data_field_position:data_field_position+data_step]
-                                data_field_position += len(key)
-
-                                value = avl_data_start[data_field_position:data_field_position+16]
-                                io_dict[int(key, 16)] = sorting_hat(int(key, 16), value)
-                                data_field_position += len(value)
-                                print(f"avl_ID: {int(key, 16)} : {io_dict[int(key, 16)]}")
-                                i += 1
-                else:
-                        pass
-
-                if codec_type.upper() == "8E":
-
-                        byteX_io_number = avl_data_start[data_field_position:data_field_position+4]
-                        byteX_io_number_parsed = int(byteX_io_number, 16)
-                        print(f"X byte io count = {byteX_io_number_parsed}")
-                        data_field_position += len(byteX_io_number)
-
-                        if byteX_io_number_parsed > 0:
-                                i = 1
-                                while i <= byteX_io_number_parsed:
-                                        key = avl_data_start[data_field_position:data_field_position+4]
-                                        data_field_position += len(key)
-
-                                        value_length = avl_data_start[data_field_position:data_field_position+4]
-                                        data_field_position += 4
-                                        value = avl_data_start[data_field_position:data_field_position+(2*(int(value_length, 16)))]
-                                        io_dict[int(key, 16)] = sorting_hat(int(key, 16), value)
-                                        data_field_position += len(value)
-                                        print(f"avl_ID: {int(key, 16)} : {io_dict[int(key, 16)]}")
-                                #       print (f"data field postition = {data_field_position}")
-                                #       print (f"data_field_length = {2*data_field_length}")
-                                        i += 1
-                        else:
-                                pass
-                else:
-                        pass
-
-                record_number += 1
-
-                try: #writing dictionary to ./data/data.json
-                        json_printer(io_dict, device_imei)
-                except Exception as e:
-                        print(f"JSON writing error occured = {e}")
-
-        if props == "SERVER":
-
-                total_records_parsed = int(avl_data_start[data_field_position:data_field_position+2], 16)
-                print()
-                print(f"total parsed records = {total_records_parsed}")
-                print()
-                return int(number_of_records)
-
-        else:
-                total_records_parsed = int(avl_data_start[data_field_position:data_field_position+2], 16)
-                print()
-                print(f"total parsed records = {total_records_parsed}")
-                print()
-                input_trigger()
 
 ####################################################
 ###############_End_of_MAIN_Parser_Code#############
@@ -430,7 +192,6 @@ def json_printer_rawDATA(io_dict_raw, device_imei): #function to write JSON file
         else:
                 with open(os.path.join(data_path, json_file), "a") as file:
                         file.write(json_data)
-        #subprocess.run(["sudo", "cp", "/home/ubuntu/serwer_do_czegokolwiek/data/" + str(device_imei) + "/" + str(device_imei) + "_data.json", "/var/www/backend/" + str(device_imei) + "_data.json"] , check=True)
         return
 ####################################################
 ###############____TIME_FUNCTIONS____###############
@@ -487,49 +248,6 @@ def signed_no_multiply(data): #need more testing of this function
         except Exception as e:
                 print(f"unexpected value received in function '{data}' error: '{e}' will leave unparsed value!")
                 return f"0x{data}"
-
-parse_functions_dictionary = { #this must simply be updated with new AVL IDs and their functions
-
-        240: parse_data_integer,
-        239: parse_data_integer,
-        80: parse_data_integer,
-        21: parse_data_integer,
-        200: parse_data_integer,
-        69: parse_data_integer,
-        181: int_multiply_01,
-        182: int_multiply_01,
-        66: int_multiply_0001,
-        24: parse_data_integer,
-        205: parse_data_integer,
-        206: parse_data_integer,
-        67: int_multiply_0001,
-        68: int_multiply_0001,
-        241: parse_data_integer,
-        299: parse_data_integer,
-        16: parse_data_integer,
-        1: parse_data_integer,
-        9: parse_data_integer,
-        179: parse_data_integer,
-        12: int_multiply_0001,
-        13: int_multiply_001,
-        17: signed_no_multiply,
-        18: signed_no_multiply,
-        19: signed_no_multiply,
-        11: parse_data_integer,
-        10: parse_data_integer,
-        2: parse_data_integer,
-        3: parse_data_integer,
-        6: int_multiply_0001,
-        180: parse_data_integer
-
-}
-
-def sorting_hat(key, value):
-        if key in parse_functions_dictionary:
-                parse_function = parse_functions_dictionary[key]
-                return parse_function(value)
-        else:
-                return f"0x{value}"
 
 ####################################################
 
